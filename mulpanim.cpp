@@ -50,9 +50,11 @@
 #define WIDTH  1500
 #define HEIGHT 1500
 
+// comment out if you don't want debug text
+#define DEBUG
+
 #define RAD WIDTH/2.2
-#define N 400
-#define MULP 2
+#define N 200
 
 void must_init (bool test, const char *description){
     if(test)return;
@@ -92,6 +94,9 @@ int main(int argc, char **argv) {
     must_init(font, "font");
 
     // Main program window
+    al_set_new_display_option(ALLEGRO_SAMPLE_BUFFERS, 1, ALLEGRO_SUGGEST);
+    al_set_new_display_option(ALLEGRO_SAMPLES, 8, ALLEGRO_SUGGEST);
+    al_set_new_bitmap_flags(ALLEGRO_MIN_LINEAR | ALLEGRO_MAG_LINEAR); 
     ALLEGRO_DISPLAY *main_disp = al_create_display(Wi,Hi);
     must_init(main_disp, "display");
 
@@ -110,7 +115,7 @@ int main(int argc, char **argv) {
 
     int num_pt = N;
     double multiplier = 1;
-    char disp[50];
+    double speed = 0.01;
     bool anim = true;
 
     // ---------------------
@@ -135,23 +140,37 @@ int main(int argc, char **argv) {
                     multiplier += 1;
                 }
 
-                if(key[ALLEGRO_KEY_UP] & KEY_RELEASED == KEY_RELEASED){
+                if(key[ALLEGRO_KEY_DOWN] & KEY_RELEASED == KEY_RELEASED){
                     num_pt = (num_pt==0) ? 0 : num_pt - 10 ;
                 }  
-                if(key[ALLEGRO_KEY_DOWN] & KEY_RELEASED == KEY_RELEASED){
+                if(key[ALLEGRO_KEY_UP] & KEY_RELEASED == KEY_RELEASED){
                     num_pt += 10;
+                }
+
+                if(key[ALLEGRO_KEY_N] & KEY_RELEASED == KEY_RELEASED){
+                    speed = (speed==0) ? 0 : speed * 0.5 ;
+                }  
+                if(key[ALLEGRO_KEY_M] & KEY_RELEASED == KEY_RELEASED){
+                    speed *= 2;
+                }
+
+                if(key[ALLEGRO_KEY_R] & KEY_RELEASED == KEY_RELEASED){
+                    speed = -speed;
+                }
+
+                if(key[ALLEGRO_KEY_B] & KEY_RELEASED == KEY_RELEASED){
+                    multiplier = round(multiplier);
                 }
 
                 if(key[ALLEGRO_KEY_SPACE] & KEY_RELEASED == KEY_RELEASED){
                     anim = !anim;
-                    multiplier = round(multiplier);
                 }
 
                 for( int i = 0; i < ALLEGRO_KEY_MAX; i++) key[i] &= 0;
 
                 redraw = true;
 
-                if( anim ) multiplier = (multiplier > num_pt) ? multiplier = 1 : multiplier + 0.01;
+                if( anim ) multiplier = (multiplier > num_pt) ? multiplier = 1 : multiplier + speed;
 
                 break;
 
@@ -173,9 +192,12 @@ int main(int argc, char **argv) {
             // main event loop
             al_clear_to_color(al_map_rgb(0,0,0));
 
+#ifdef DEBUG
             al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 0, 0, "Multiplier = %2f", multiplier);
             al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 15, 0, "Number of Points = %d", num_pt);
-            al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 30, 0, "Animating? = %d", anim);
+            al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 30, 0, "Animating? %d", anim);
+            al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 45, 0, "Speed = %f", speed);
+#endif
 
 
             // draw our circle
@@ -185,16 +207,18 @@ int main(int argc, char **argv) {
                 // draw each circle
                 Point p;
 
+                #ifdef DEBUG_LABELS
                 // Label each point on the circle
                 getPt(i, num_pt, RAD+30, &p);
                 int flag = (i < (num_pt/4) || i > (3*num_pt/4)) ? ALLEGRO_ALIGN_LEFT : ALLEGRO_ALIGN_RIGHT;
                 al_draw_textf(font, al_map_rgb(255, 255, 255), p.x, p.y, flag, "%3d", i);
+                #endif
 
                 getPt(i, num_pt, RAD, &p);
                 al_draw_circle(p.x, p.y, 2, al_map_rgb(255, 255, 255), 1);
 
                 // calculate the multiple modulo
-                float ni = fmod(i*multiplier,N);
+                float ni = fmod(i*multiplier,num_pt);
                 // draw the line between the two
                 Point np;
                 getPt(ni, num_pt, RAD, &np);
