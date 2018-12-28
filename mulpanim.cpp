@@ -65,10 +65,10 @@ struct Point{
     int y;
 };
 
-void getPt(float n, int maxN, Point * p){
+void getPt(float n, int maxN, int radius, Point * p){
     float th = 2 * M_PI * (n/maxN);
-    p->x = RAD * cos(th) + WIDTH/2;
-    p->y = RAD * sin(th) + HEIGHT/2; 
+    p->x = radius * cos(th) + WIDTH/2;
+    p->y = radius * sin(th) + HEIGHT/2; 
 }
 
 // Main
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     must_init(al_install_keyboard(),"keyboard");
     must_init(al_init_primitives_addon(), "primitives");
 
-    ALLEGRO_TIMER *timer = al_create_timer(1.0/30.0);
+    ALLEGRO_TIMER *timer = al_create_timer(1.0/60.0);
     must_init(timer, "timer");
 
     ALLEGRO_EVENT_QUEUE *queue = al_create_event_queue();
@@ -107,10 +107,11 @@ int main(int argc, char **argv) {
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_display_event_source(main_disp));
     al_register_event_source(queue, al_get_timer_event_source(timer));
-    
+
     int num_pt = N;
     double multiplier = 1;
     char disp[50];
+    bool anim = true;
 
     // ---------------------
     // The main loop
@@ -128,10 +129,10 @@ int main(int argc, char **argv) {
                 }
 
                 if(key[ALLEGRO_KEY_LEFT] & KEY_RELEASED == KEY_RELEASED){
-                    multiplier = (multiplier==0) ? 0 : multiplier - 0.1 ;
+                    multiplier = (multiplier==0) ? 0 : multiplier - 1 ;
                 }  
                 if(key[ALLEGRO_KEY_RIGHT] & KEY_RELEASED == KEY_RELEASED){
-                    multiplier += 0.1;
+                    multiplier += 1;
                 }
 
                 if(key[ALLEGRO_KEY_UP] & KEY_RELEASED == KEY_RELEASED){
@@ -141,11 +142,16 @@ int main(int argc, char **argv) {
                     num_pt += 10;
                 }
 
+                if(key[ALLEGRO_KEY_SPACE] & KEY_RELEASED == KEY_RELEASED){
+                    anim = !anim;
+                    multiplier = round(multiplier);
+                }
+
                 for( int i = 0; i < ALLEGRO_KEY_MAX; i++) key[i] &= 0;
 
                 redraw = true;
 
-                multiplier = (multiplier > num_pt) ? multiplier = 1 : multiplier + 0.05;
+                if( anim ) multiplier = (multiplier > num_pt) ? multiplier = 1 : multiplier + 0.01;
 
                 break;
 
@@ -167,8 +173,10 @@ int main(int argc, char **argv) {
             // main event loop
             al_clear_to_color(al_map_rgb(0,0,0));
 
-            snprintf(disp, 50, "Multiplier = %2f Number of Points = %d", multiplier, num_pt);
-            al_draw_text(font, al_map_rgb(255, 255, 255), 0, 0, 0, disp);
+            al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 0, 0, "Multiplier = %2f", multiplier);
+            al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 15, 0, "Number of Points = %d", num_pt);
+            al_draw_textf(font, al_map_rgb(255, 255, 255), 0, 30, 0, "Animating? = %d", anim);
+
 
             // draw our circle
             al_draw_circle(WIDTH/2, HEIGHT/2, RAD, al_map_rgb(255, 0, 255), 2);
@@ -176,14 +184,20 @@ int main(int argc, char **argv) {
             for (int i = 0; i < num_pt; i++){
                 // draw each circle
                 Point p;
-                getPt(i, num_pt, &p);
+
+                // Label each point on the circle
+                getPt(i, num_pt, RAD+30, &p);
+                int flag = (i < (num_pt/4) || i > (3*num_pt/4)) ? ALLEGRO_ALIGN_LEFT : ALLEGRO_ALIGN_RIGHT;
+                al_draw_textf(font, al_map_rgb(255, 255, 255), p.x, p.y, flag, "%3d", i);
+
+                getPt(i, num_pt, RAD, &p);
                 al_draw_circle(p.x, p.y, 2, al_map_rgb(255, 255, 255), 1);
 
                 // calculate the multiple modulo
                 float ni = fmod(i*multiplier,N);
                 // draw the line between the two
                 Point np;
-                getPt(ni, num_pt, &np);
+                getPt(ni, num_pt, RAD, &np);
                 
                 al_draw_line(p.x,p.y,np.x,np.y,al_map_rgb(multiplier,255,255),1);
             }
@@ -195,6 +209,7 @@ int main(int argc, char **argv) {
     al_destroy_display(main_disp);
     al_destroy_timer(timer);
     al_destroy_event_queue(queue);
+    al_destroy_font(font);
 
     // End the game
     return 0;
