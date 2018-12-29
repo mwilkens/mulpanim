@@ -62,6 +62,21 @@ void must_init (bool test, const char *description){
     exit(1);
 }
 
+typedef struct {
+    double r;       // a fraction between 0 and 1
+    double g;       // a fraction between 0 and 1
+    double b;       // a fraction between 0 and 1
+} rgb;
+
+typedef struct {
+    double h;       // angle in degrees
+    double s;       // a fraction between 0 and 1
+    double v;       // a fraction between 0 and 1
+} hsv;
+
+static hsv   rgb2hsv(rgb in);
+static rgb   hsv2rgb(hsv in);
+
 struct Point{
     int x;
     int y;
@@ -84,7 +99,7 @@ int main(int argc, char **argv) {
     must_init(al_install_keyboard(),"keyboard");
     must_init(al_init_primitives_addon(), "primitives");
 
-    ALLEGRO_TIMER *timer = al_create_timer(1.0/60.0);
+    ALLEGRO_TIMER *timer = al_create_timer(1.0/30.0);
     must_init(timer, "timer");
 
     ALLEGRO_EVENT_QUEUE *queue = al_create_event_queue();
@@ -115,8 +130,10 @@ int main(int argc, char **argv) {
 
     int num_pt = N;
     double multiplier = 1;
-    double speed = 0.01;
+    double speed = 0.05;
     bool anim = true;
+
+    char fn[20]; int file = 0;
 
     // ---------------------
     // The main loop
@@ -201,7 +218,7 @@ int main(int argc, char **argv) {
 
 
             // draw our circle
-            al_draw_circle(WIDTH/2, HEIGHT/2, RAD, al_map_rgb(255, 0, 255), 2);
+            al_draw_circle(WIDTH/2, HEIGHT/2, RAD, al_map_rgb(50, 50, 50), 6);
 
             for (int i = 0; i < num_pt; i++){
                 // draw each circle
@@ -215,16 +232,28 @@ int main(int argc, char **argv) {
                 #endif
 
                 getPt(i, num_pt, RAD, &p);
-                al_draw_circle(p.x, p.y, 2, al_map_rgb(255, 255, 255), 1);
+                al_draw_filled_circle(p.x, p.y, 3, al_map_rgb(255, 255, 255));
 
                 // calculate the multiple modulo
                 float ni = fmod(i*multiplier,num_pt);
                 // draw the line between the two
                 Point np;
                 getPt(ni, num_pt, RAD, &np);
+
+                // Calculate color
+                hsv col_map;
+                col_map.h = 360.0 * fmod(multiplier,50) / 50;
+                col_map.s = 0.5; col_map.v = 1.0;
+                rgb col = hsv2rgb(col_map);
                 
-                al_draw_line(p.x,p.y,np.x,np.y,al_map_rgb(multiplier,255,255),1);
+                al_draw_line(p.x,p.y,np.x,np.y,al_map_rgb(255*col.r,255*col.g,255*col.b),2);
             }
+
+            // attempted backbuffer saving for making gifs, failed though
+            /*ALLEGRO_BITMAP * bmp = al_get_backbuffer(main_disp);
+            snprintf(fn,20,"gif/%d.jpg",file);
+            if ( !al_save_bitmap(fn,bmp) ) printf("Saving file %s failed!!!\n", fn);
+            file++;*/
 
             al_flip_display();
             redraw = false;
@@ -237,4 +266,107 @@ int main(int argc, char **argv) {
 
     // End the game
     return 0;
+}
+
+hsv rgb2hsv(rgb in)
+{
+    hsv         out;
+    double      min, max, delta;
+
+    min = in.r < in.g ? in.r : in.g;
+    min = min  < in.b ? min  : in.b;
+
+    max = in.r > in.g ? in.r : in.g;
+    max = max  > in.b ? max  : in.b;
+
+    out.v = max;                                // v
+    delta = max - min;
+    if (delta < 0.00001)
+    {
+        out.s = 0;
+        out.h = 0; // undefined, maybe nan?
+        return out;
+    }
+    if( max > 0.0 ) { // NOTE: if Max is == 0, this divide would cause a crash
+        out.s = (delta / max);                  // s
+    } else {
+        // if max is 0, then r = g = b = 0              
+        // s = 0, h is undefined
+        out.s = 0.0;
+        out.h = NAN;                            // its now undefined
+        return out;
+    }
+    if( in.r >= max )                           // > is bogus, just keeps compilor happy
+        out.h = ( in.g - in.b ) / delta;        // between yellow & magenta
+    else
+    if( in.g >= max )
+        out.h = 2.0 + ( in.b - in.r ) / delta;  // between cyan & yellow
+    else
+        out.h = 4.0 + ( in.r - in.g ) / delta;  // between magenta & cyan
+
+    out.h *= 60.0;                              // degrees
+
+    if( out.h < 0.0 )
+        out.h += 360.0;
+
+    return out;
+}
+
+
+rgb hsv2rgb(hsv in)
+{
+    double      hh, p, q, t, ff;
+    long        i;
+    rgb         out;
+
+    if(in.s <= 0.0) {       // < is bogus, just shuts up warnings
+        out.r = in.v;
+        out.g = in.v;
+        out.b = in.v;
+        return out;
+    }
+    hh = in.h;
+    if(hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = in.v * (1.0 - in.s);
+    q = in.v * (1.0 - (in.s * ff));
+    t = in.v * (1.0 - (in.s * (1.0 - ff)));
+
+    switch(i) {
+    case 0:
+        out.r = in.v;
+        out.g = t;
+        out.b = p;
+        break;
+    case 1:
+        out.r = q;
+        out.g = in.v;
+        out.b = p;
+        break;
+    case 2:
+        out.r = p;
+        out.g = in.v;
+        out.b = t;
+        break;
+
+    case 3:
+        out.r = p;
+        out.g = q;
+        out.b = in.v;
+        break;
+    case 4:
+        out.r = t;
+        out.g = p;
+        out.b = in.v;
+        break;
+    case 5:
+    default:
+        out.r = in.v;
+        out.g = p;
+        out.b = q;
+        break;
+    }
+    return out;     
 }
